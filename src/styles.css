@@ -1,0 +1,33 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: #FBF3E7;
+  font-family: 'IBM Plex Sans KR', sans-serif;
+  color: #201A16;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+input, textarea, button, select { font-family: 'IBM Plex Sans KR', sans-serif; }
+button { cursor: pointer; }
+input:focus, textarea:focus { outline: 2px solid #F4702B; outline-offset: 1px; }
+.bhs { font-family: 'Black Han Sans', sans-serif; font-weight: 400; }
+
+@keyframes pop { 0%{transform:scale(.4);opacity:0} 60%{transform:scale(1.08);opacity:1} 100%{transform:scale(1)} }
+@keyframes glow { 0%,100%{box-shadow:0 0 14px rgba(247,201,72,.35)} 50%{box-shadow:0 0 34px rgba(247,201,72,.75)} }
+@keyframes blinkred { 0%,100%{opacity:1} 50%{opacity:.45} }
+@keyframes risein { from{transform:translateY(14px);opacity:0} to{transform:translateY(0);opacity:1} }
+@keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-7px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(3px)} }
+@keyframes collapse {
+  0% { filter:grayscale(0); opacity:1; transform:translateY(0) rotate(0deg); }
+  100% { filter:grayscale(1); opacity:.28; transform:translateY(36px) rotate(var(--tilt, -3deg)); }
+}
+@keyframes flashwhite { 0%{opacity:.9} 100%{opacity:0} }
+@keyframes floatup { from{transform:translateY(0)} to{transform:translateY(-8px)} }
+
+.pop { animation: pop .35s cubic-bezier(.2,1.6,.4,1); }
+.risein { animation: risein .3s ease; }
+.shake { animation: shake .4s ease; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: #C9BBA8; border-radius: 999px; }
+::-webkit-scrollbar-track { background: transparent; }
