@@ -629,9 +629,21 @@ grant execute on function auction_get_class_by_key(text, text) to anon, authenti
 revoke execute on function auction__auth_teacher(uuid, text) from anon, authenticated;
 
 -- ============================================================
--- 30일 지난 반 데이터 정리 (수동 실행 또는 pg_cron 등록)
---   delete from auction_classes where created_at < now() - interval '30 days';
--- pg_cron 사용 시:
---   select cron.schedule('auction-cleanup', '0 4 * * *',
---     $cron$ delete from auction_classes where created_at < now() - interval '30 days' $cron$);
+-- 30일 지난 반 데이터 자동 삭제 (pg_cron)
+-- auction_classes를 지우면 students/items/bids/reflections/class_keys는
+-- 전부 on delete cascade로 함께 정리된다. 매일 새벽 4시(UTC) 실행.
 -- ============================================================
+
+create extension if not exists pg_cron;
+
+do $$
+begin
+  perform cron.unschedule('auction-cleanup');
+exception when others then null;
+end $$;
+
+select cron.schedule(
+  'auction-cleanup',
+  '0 4 * * *',
+  $cron$ delete from auction_classes where created_at < now() - interval '30 days' $cron$
+);
