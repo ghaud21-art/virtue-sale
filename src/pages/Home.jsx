@@ -7,7 +7,7 @@ import { GavelIcon, CoinIcon } from '../components/icons'
 const roles = [
   {
     to: '/teacher', title: '교사 화면', icon: <GavelIcon size={26} />,
-    desc: '반을 만들고 학생 제안을 승인한 뒤 경매를 진행합니다. 종료 후 반전 공개와 결과 내보내기까지.',
+    desc: '반을 만들고 학생 제안을 승인한 뒤 경매를 진행합니다. 종료 후 결과 내보내기까지.',
     cta: '반 만들기 / 이어하기', accent: C.orange,
   },
   {
@@ -22,10 +22,7 @@ export default function Home() {
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '48px 24px 80px' }}>
       <div style={{ textAlign: 'center', marginBottom: 40 }}>
         <div className="bhs" style={{ fontSize: 44, lineHeight: 1.25 }}>
-          1,000P로 당신의 <span style={{ color: C.orange }}>행복</span>을 낙찰받으세요
-        </div>
-        <div style={{ fontSize: 15, color: C.muted, marginTop: 10 }}>
-          반 전체가 실시간으로 참여하는 가치 경매 — 경매가 끝나면, 반전이 시작됩니다.
+          반 전체가 실시간으로 참여하는 가치 경매
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
