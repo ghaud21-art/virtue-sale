@@ -142,7 +142,7 @@ function ProposeStep({ studentId, items, onNext }) {
   return (
     <div style={{ padding: '32px 24px 32px', display: 'grid', gap: 16 }}>
       <div style={{ fontSize: 12, fontWeight: 700, color: C.orange, letterSpacing: '.08em' }}>STEP 1 · 가치 제안</div>
-      <div className="bhs" style={{ fontSize: 24, lineHeight: 1.35 }}>나에게 진정한 행복을 위해<br />꼭 필요한 것은?</div>
+      <div className="bhs" style={{ fontSize: 24, lineHeight: 1.35 }}>행복한 삶을 위해<br />필요한 것은?</div>
       <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>한 가지만 제출할 수 있어요. 제출된 가치는 선생님 승인 후 경매 목록에 올라갑니다.</div>
       <textarea value={value} onChange={e => setValue(e.target.value)} placeholder="예: 마음의 평온" maxLength={30}
         style={{ width: '100%', boxSizing: 'border-box', border: `2px solid ${C.ink}`, borderRadius: 14, padding: 16, fontSize: 16, minHeight: 110, resize: 'none' }} />
