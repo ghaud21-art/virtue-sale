@@ -1,8 +1,8 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { C, fmt, tagMeta, reflectQuestions, happinessPrompt, MIN_INCREMENT } from '../lib/meta'
+import { C, fmt, reflectQuestions, happinessPrompt, MIN_INCREMENT } from '../lib/meta'
 import { api, session } from '../lib/api'
 import { useClassData, useServerClock, useCountdown } from '../hooks/useClassData'
-import { PrimaryBtn, Field, inputStyle, ErrorNote, InfoNote, LiveDot, TagPill } from '../components/ui'
+import { PrimaryBtn, Field, inputStyle, ErrorNote, InfoNote, LiveDot } from '../components/ui'
 import { GavelIcon, CoinIcon, InfoIcon, DownloadIcon } from '../components/icons'
 import html2canvas from 'html2canvas'
 
@@ -144,7 +144,7 @@ function ProposeStep({ studentId, items, onNext }) {
       <div style={{ fontSize: 12, fontWeight: 700, color: C.orange, letterSpacing: '.08em' }}>STEP 1 · 가치 제안</div>
       <div className="bhs" style={{ fontSize: 24, lineHeight: 1.35 }}>행복한 삶을 위해<br />필요한 것은?</div>
       <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>한 가지만 제출할 수 있어요. 제출된 가치는 선생님 승인 후 경매 목록에 올라갑니다.</div>
-      <textarea value={value} onChange={e => setValue(e.target.value)} placeholder="예: 마음의 평온" maxLength={30}
+      <textarea value={value} onChange={e => setValue(e.target.value)} placeholder="예: 마음의 평온, 100억 원의 자산" maxLength={30}
         style={{ width: '100%', boxSizing: 'border-box', border: `2px solid ${C.ink}`, borderRadius: 14, padding: 16, fontSize: 16, minHeight: 110, resize: 'none' }} />
       <InfoNote><InfoIcon />물건이 아니어도 좋아요. 상태, 관계, 명예 모두 가능합니다.</InfoNote>
       <ErrorNote>{error}</ErrorNote>
@@ -190,17 +190,18 @@ function AuctionStep({ classId, studentId, me, items, bids, serverNow, klass, on
 
   if (!active) {
     return (
-      <div style={{ padding: '40px 24px', display: 'grid', gap: 16, textAlign: 'center' }}>
-        <div className="bhs" style={{ fontSize: 22 }}>경매 대기 중</div>
-        <div style={{ fontSize: 13, color: C.muted }}>선생님이 다음 매물을 올릴 때까지 기다려 주세요.</div>
-        {klass?.status === 'reflect' || klass?.status === 'twist' || klass?.status === 'done' ? (
+      <div style={{ padding: '32px 24px 28px', display: 'grid', gap: 16 }}>
+        <div style={{ textAlign: 'center' }}>
+          <div className="bhs" style={{ fontSize: 22 }}>경매 대기 중</div>
+          <div style={{ fontSize: 13, color: C.muted, marginTop: 4 }}>선생님이 다음 매물을 올릴 때까지 기다려 주세요.</div>
+        </div>
+        {(klass?.status === 'reflect' || klass?.status === 'twist' || klass?.status === 'done') && (
           <PrimaryBtn onClick={onReflect}>성찰로 이동</PrimaryBtn>
-        ) : null}
+        )}
+        <ItemRoster items={items} />
       </div>
     )
   }
-
-  const curTag = tagMeta(active.tag)
 
   return (
     <>
@@ -215,8 +216,8 @@ function AuctionStep({ classId, studentId, me, items, bids, serverNow, klass, on
       </div>
       <div style={{ padding: '22px 20px 28px', display: 'grid', gap: 14 }}>
         <div style={{ background: C.ink, color: C.bg, borderRadius: 18, padding: 20, textAlign: 'center' }}>
-          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, border: `1.5px solid ${C.bg}`, color: active.tag === 'in' ? C.greenLite : C.orangeLite }}>{curTag.label}</span>
-          <div className="bhs" style={{ fontSize: 30, margin: '10px 0 4px', color: C.yellow }}>{active.name}</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.faint, letterSpacing: '.08em' }}>현재 매물</div>
+          <div className="bhs" style={{ fontSize: 30, margin: '6px 0 4px', color: C.yellow }}>{active.name}</div>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 22, marginTop: 10 }}>
             <div><div style={{ fontSize: 11, color: C.faint }}>현재 최고가</div><div className="bhs" style={{ fontSize: 26, color: '#fff' }}>{fmt(topBid?.amount || 0)}P</div></div>
             <div style={{ whiteSpace: 'nowrap' }}><div style={{ fontSize: 11, color: C.faint }}>최고 입찰자</div><div style={{ fontWeight: 700, fontSize: 18, marginTop: 4 }}>{topBid?.student_name || '—'}</div></div>
@@ -246,6 +247,7 @@ function AuctionStep({ classId, studentId, me, items, bids, serverNow, klass, on
             <InfoNote><InfoIcon />잔액 초과·현재 최고가 이하 금액은 입찰할 수 없어요. 최소 {MIN_INCREMENT}P 단위로 올려야 해요.</InfoNote>
           </div>
         )}
+        <ItemRoster items={items} />
         <button onClick={onReflect} style={{ background: 'none', border: 'none', color: C.muted, fontSize: 12, fontWeight: 700, textDecoration: 'underline' }}>
           경매가 끝났나요? 성찰로 이동 →
         </button>
@@ -256,6 +258,45 @@ function AuctionStep({ classId, studentId, me, items, bids, serverNow, klass, on
 
 const quickBtn = {
   border: `2px solid ${C.ink}`, background: '#fff', borderRadius: 12, padding: '0 12px', fontWeight: 700, fontSize: 13,
+}
+
+// 학생에게 전체 매물 목록을 보여준다. 내재/외재 태그는 반전 전까지 스포일러가 되므로 표시하지 않는다.
+function ItemRoster({ items }) {
+  const list = useMemo(() => {
+    return items.filter(i => i.approved).slice().sort((a, b) => {
+      const ao = a.order_no ?? Infinity, bo = b.order_no ?? Infinity
+      if (ao !== bo) return ao - bo
+      return new Date(a.created_at) - new Date(b.created_at)
+    })
+  }, [items])
+  if (!list.length) return null
+
+  const statusMeta = (status) => {
+    if (status === 'sold') return { label: '낙찰', color: C.faint }
+    if (status === 'active') return { label: '진행중', color: C.orange }
+    return { label: '대기', color: C.muted }
+  }
+
+  return (
+    <div style={{ border: `1.5px solid ${C.line}`, borderRadius: 14, padding: '12px 14px' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, marginBottom: 8 }}>전체 매물 ({list.length}개)</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 200, overflow: 'auto' }}>
+        {list.map(i => {
+          const s = statusMeta(i.status)
+          return (
+            <div key={i.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 13 }}>
+              <span style={{
+                color: i.status === 'sold' ? C.faint : C.ink,
+                textDecoration: i.status === 'sold' ? 'line-through' : 'none',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{i.name}</span>
+              <span style={{ fontWeight: 700, fontSize: 11, color: s.color, flexShrink: 0 }}>{s.label}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 // ---------------- 성찰 ----------------

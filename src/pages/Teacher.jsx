@@ -3,7 +3,7 @@ import { C, fmt, tagMeta, TARGET_ITEM_COUNT, STATUS_LABEL, timeStr, DEFAULT_REFL
 import { api, session } from '../lib/api'
 import { useClassData, useServerClock, useCountdown } from '../hooks/useClassData'
 import { Card, PrimaryBtn, GhostBtn, TagPill, LiveDot, Field, inputStyle, ErrorNote } from '../components/ui'
-import { TimerIcon, DownloadIcon, CopyIcon, CheckIcon } from '../components/icons'
+import { TimerIcon, DownloadIcon, CopyIcon, CheckIcon, CoinIcon } from '../components/icons'
 import * as XLSX from 'xlsx'
 
 const TABS = [
@@ -48,6 +48,9 @@ export default function Teacher() {
           <span style={{ fontSize: 12, fontWeight: 700, color: C.muted }}>
             반 코드 <span style={{ color: C.orange }}>{code}</span> · {STATUS_LABEL[data.klass?.status] || '-'}
           </span>
+          <GhostBtn onClick={() => window.open('/student', '_blank', 'noopener')} style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <CoinIcon size={13} color={C.ink} />학생 화면 미리보기
+          </GhostBtn>
           <GhostBtn onClick={() => window.open('/board', '_blank', 'noopener')} style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <TimerIcon size={13} color={C.ink} />전광판 열기
           </GhostBtn>

@@ -8,20 +8,9 @@ import Student from './pages/Student'
 import Board from './pages/Board'
 
 function Header() {
-  const loc = useLocation()
-  const tab = (path, label) => {
-    const on = loc.pathname.startsWith(path)
-    return (
-      <Link to={path} style={{
-        textDecoration: 'none', padding: '8px 18px', borderRadius: 999,
-        fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap',
-        background: on ? C.ink : '#fff', color: on ? C.yellow : C.ink,
-      }}>{label}</Link>
-    )
-  }
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+      display: 'flex', alignItems: 'center', gap: 16,
       padding: '14px 24px', borderBottom: `2px solid ${C.ink}`, background: C.bg,
       position: 'sticky', top: 0, zIndex: 50,
     }}>
@@ -37,10 +26,6 @@ function Header() {
           <div style={{ fontSize: 11, color: C.muted }}>학습용 실시간 가치경매 게임</div>
         </div>
       </Link>
-      <div style={{ display: 'flex', gap: 6, background: '#fff', border: `2px solid ${C.ink}`, borderRadius: 999, padding: 4 }}>
-        {tab('/teacher', '교사 화면')}
-        {tab('/student', '학생 화면')}
-      </div>
     </div>
   )
 }

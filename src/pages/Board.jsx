@@ -1,12 +1,12 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { C, fmt, tagMeta, timeStr } from '../lib/meta'
+import { C, fmt, timeStr } from '../lib/meta'
 import { api, session } from '../lib/api'
 import { useClassData, useServerClock, useCountdown } from '../hooks/useClassData'
 import { LiveDot } from '../components/ui'
 import { GavelIcon } from '../components/icons'
 
 const MODES = [
-  ['live', '경매 LIVE'], ['reveal', '반전 연출'], ['stand', '낙찰 현황판'],
+  ['live', '경매 LIVE'], ['reveal', '경매 종료'], ['stand', '낙찰 현황판'],
 ]
 
 export default function Board() {
@@ -31,7 +31,7 @@ export default function Board() {
     <div style={{ background: C.darkBg, minHeight: 'calc(100vh - 65px)', padding: '26px 32px 60px', color: C.bg, position: 'relative', overflow: 'hidden' }}>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginBottom: 26 }}>
         {MODES.map(([k, label]) => (
-          <button key={k} onClick={() => { setMode(k); if (k !== 'reveal') setRevealOn(false) }} style={{
+          <button key={k} onClick={() => setMode(k)} style={{
             padding: '8px 18px', borderRadius: 999, border: `2px solid ${C.yellow}`, fontWeight: 700,
             fontSize: 13, whiteSpace: 'nowrap', background: mode === k ? C.yellow : 'transparent',
             color: mode === k ? C.ink : C.yellow,
@@ -41,8 +41,8 @@ export default function Board() {
       {data.loading ? <div style={{ textAlign: 'center', color: C.faint, padding: 100 }}>불러오는 중...</div> : (
         <>
           {mode === 'live' && <LiveMode items={data.items} bids={data.bids} students={data.students} serverNow={serverNow} />}
-          {mode === 'reveal' && <RevealMode items={data.items} students={data.students} revealOn={revealOn} setRevealOn={setRevealOn} schoolBadge={data.klass?.school_badge_enabled ?? true} />}
-          {mode === 'stand' && <StandMode items={data.items} students={data.students} />}
+          {mode === 'reveal' && <RevealMode items={data.items} students={data.students} revealOn={revealOn} setRevealOn={setRevealOn} />}
+          {mode === 'stand' && <StandMode items={data.items} students={data.students} revealed={revealOn} />}
         </>
       )}
     </div>
@@ -106,14 +106,15 @@ function LiveMode({ items, bids, students, serverNow }) {
 
   if (!active) {
     return (
-      <div style={{ maxWidth: 900, margin: '80px auto', textAlign: 'center', border: `2px solid ${C.darkLine}`, borderRadius: 28, padding: '60px 30px' }}>
-        <div className="bhs" style={{ fontSize: 40, color: C.faint }}>경매 대기 중</div>
-        <div style={{ fontSize: 15, color: C.darkFaint, marginTop: 10 }}>교사 화면에서 매물을 올리면 여기 표시됩니다.</div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.6fr 1fr', gap: 28, maxWidth: 1280, margin: '0 auto', alignItems: 'stretch' }}>
+        <div style={{ textAlign: 'center', border: `2px solid ${C.darkLine}`, borderRadius: 28, padding: '60px 30px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div className="bhs" style={{ fontSize: 40, color: C.faint }}>경매 대기 중</div>
+          <div style={{ fontSize: 15, color: C.darkFaint, marginTop: 10 }}>교사 화면에서 매물을 올리면 여기 표시됩니다.</div>
+        </div>
+        <ItemRoster items={items} />
       </div>
     )
   }
-
-  const curTag = tagMeta(active.tag)
 
   return (
     <>
@@ -125,7 +126,6 @@ function LiveMode({ items, bids, students, serverNow }) {
         }}>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12 }}>
             <LiveDot label="LIVE" size={10} fontSize={14} />
-            <span style={{ fontSize: 13, fontWeight: 700, padding: '4px 14px', borderRadius: 999, border: `2px solid ${C.yellow}`, color: C.yellow, whiteSpace: 'nowrap' }}>{curTag.label}</span>
           </div>
           <div className="bhs" style={{ fontSize: 84, lineHeight: 1.15, color: '#fff', margin: '18px 0 8px' }}>{active.name}</div>
           <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: 14, marginTop: 8 }}>
@@ -146,16 +146,21 @@ function LiveMode({ items, bids, students, serverNow }) {
             <div style={{ marginTop: 26, fontSize: 15, color: C.darkFaint, fontWeight: 700 }}>입찰이 이어지고 있습니다</div>
           )}
         </div>
-        <div style={{ border: `2px solid ${C.darkLine}`, borderRadius: 28, padding: 24, display: 'flex', flexDirection: 'column' }}>
-          <div className="bhs" style={{ fontSize: 18, color: C.yellow, marginBottom: 14 }}>실시간 입찰 로그</div>
-          <div style={{ display: 'grid', gap: 8, alignContent: 'start', overflow: 'auto', flex: 1 }}>
-            {itemBids.slice(0, 30).map(b => (
-              <div key={b.id} className="risein" style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, borderBottom: `1px solid ${C.darkLine}`, padding: '9px 2px' }}>
-                <span style={{ color: C.darkFaint, fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{timeStr(b.created_at)}</span>
-                <span style={{ fontWeight: 700, flex: 1, color: C.bg }}>{b.student_name}</span>
-                <span style={{ fontWeight: 700, color: C.yellow }}>{fmt(b.amount)}P</span>
-              </div>
-            ))}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20, minHeight: 0 }}>
+          <div style={{ border: `2px solid ${C.darkLine}`, borderRadius: 28, padding: 24, display: 'flex', flexDirection: 'column', flex: '1.3 1 0', minHeight: 0 }}>
+            <div className="bhs" style={{ fontSize: 18, color: C.yellow, marginBottom: 14 }}>실시간 입찰 로그</div>
+            <div style={{ display: 'grid', gap: 8, alignContent: 'start', overflow: 'auto', flex: 1 }}>
+              {itemBids.slice(0, 30).map(b => (
+                <div key={b.id} className="risein" style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, borderBottom: `1px solid ${C.darkLine}`, padding: '9px 2px' }}>
+                  <span style={{ color: C.darkFaint, fontVariantNumeric: 'tabular-nums', fontSize: 12 }}>{timeStr(b.created_at)}</span>
+                  <span style={{ fontWeight: 700, flex: 1, color: C.bg }}>{b.student_name}</span>
+                  <span style={{ fontWeight: 700, color: C.yellow }}>{fmt(b.amount)}P</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ flex: '1 1 0', minHeight: 0 }}>
+            <ItemRoster items={items} />
           </div>
         </div>
       </div>
@@ -177,9 +182,48 @@ function LiveMode({ items, bids, students, serverNow }) {
   )
 }
 
+// 학생과 마찬가지로 전광판에도 전체 매물 목록을 보여준다.
+// 내재/외재 태그는 반전 전까지 스포일러가 되므로 표시하지 않는다.
+function ItemRoster({ items }) {
+  const list = useMemo(() => {
+    return items.filter(i => i.approved).slice().sort((a, b) => {
+      const ao = a.order_no ?? Infinity, bo = b.order_no ?? Infinity
+      if (ao !== bo) return ao - bo
+      return new Date(a.created_at) - new Date(b.created_at)
+    })
+  }, [items])
+
+  const statusMeta = (status) => {
+    if (status === 'sold') return { label: '낙찰', color: C.darkFaint }
+    if (status === 'active') return { label: '진행중', color: C.orange }
+    return { label: '대기', color: C.faint }
+  }
+
+  return (
+    <div style={{ border: `2px solid ${C.darkLine}`, borderRadius: 28, padding: 24, height: '100%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+      <div className="bhs" style={{ fontSize: 18, color: C.yellow, marginBottom: 14 }}>전체 매물 ({list.length}개)</div>
+      <div style={{ display: 'grid', gap: 6, alignContent: 'start', overflow: 'auto', flex: 1 }}>
+        {list.map(i => {
+          const s = statusMeta(i.status)
+          return (
+            <div key={i.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, fontSize: 14, padding: '4px 2px' }}>
+              <span style={{
+                color: i.status === 'sold' ? C.darkFaint : C.bg,
+                textDecoration: i.status === 'sold' ? 'line-through' : 'none',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{i.name}</span>
+              <span style={{ fontWeight: 700, fontSize: 11, color: s.color, flexShrink: 0 }}>{s.label}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ---------------- 반전 연출 ----------------
 
-function RevealMode({ items, students, revealOn, setRevealOn, schoolBadge }) {
+function RevealMode({ items, students, revealOn, setRevealOn }) {
   const results = useMemo(() => items.filter(i => i.status === 'sold').sort((a, b) => (a.order_no || 0) - (b.order_no || 0)), [items])
   const studentMap = useMemo(() => new Map(students.map(s => [s.id, s])), [students])
 
@@ -191,7 +235,7 @@ function RevealMode({ items, students, revealOn, setRevealOn, schoolBadge }) {
           <button onClick={() => setRevealOn(true)} style={{
             cursor: 'pointer', marginTop: 22, background: C.red, color: '#fff', border: '2px solid #fff',
             borderRadius: 16, padding: '18px 40px', fontFamily: "'Black Han Sans', sans-serif", fontSize: 24,
-          }}>반전 시작</button>
+          }}>경매 종료?</button>
         </div>
       ) : (
         <div className="pop" style={{ padding: '26px 0 10px' }}>
@@ -216,9 +260,13 @@ function RevealMode({ items, students, revealOn, setRevealOn, schoolBadge }) {
           }
           return (
             <div key={r.id} style={style}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: isIn ? C.yellow : C.darkFaint, letterSpacing: '.1em' }}>
-                {isIn ? '내재적 가치' : '외재적 가치'}
-              </div>
+              {on ? (
+                <div style={{ fontSize: 11, fontWeight: 700, color: isIn ? C.yellow : C.darkFaint, letterSpacing: '.1em' }}>
+                  {isIn ? '내재적 가치' : '외재적 가치'}
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, fontWeight: 700, color: C.darkFaint, letterSpacing: '.1em' }}>낙찰 완료</div>
+              )}
               <div className="bhs" style={{ fontSize: 20, marginTop: 8, color: on && !isIn ? C.darkFaint : '#fff' }}>{r.name}</div>
               <div style={{ fontSize: 13, fontWeight: 700, marginTop: 6, color: C.faint }}>{winner?.name || '—'} · {fmt(r.final_price)}P</div>
             </div>
@@ -236,7 +284,7 @@ function RevealMode({ items, students, revealOn, setRevealOn, schoolBadge }) {
 
 // ---------------- 낙찰 현황판 ----------------
 
-function StandMode({ items, students }) {
+function StandMode({ items, students, revealed }) {
   const results = useMemo(() => items.filter(i => i.status === 'sold'), [items])
   return (
     <div style={{ maxWidth: 1240, margin: '0 auto' }}>
@@ -252,13 +300,16 @@ function StandMode({ items, students }) {
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10, minHeight: 24 }}>
                 {wins.length === 0 && <span style={{ fontSize: 11, color: C.darkFaint }}>낙찰 없음</span>}
-                {wins.map(w => (
-                  <span key={w.id} style={{
-                    fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
-                    border: `1.5px solid ${w.tag === 'in' ? C.yellow : C.darkFaint}`, whiteSpace: 'nowrap',
-                    color: w.tag === 'in' ? C.yellow : C.faint,
-                  }}>{w.name}</span>
-                ))}
+                {wins.map(w => {
+                  const border = revealed ? (w.tag === 'in' ? C.yellow : C.darkFaint) : C.darkLine
+                  const color = revealed ? (w.tag === 'in' ? C.yellow : C.faint) : C.bg
+                  return (
+                    <span key={w.id} style={{
+                      fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999,
+                      border: `1.5px solid ${border}`, whiteSpace: 'nowrap', color,
+                    }}>{w.name}</span>
+                  )
+                })}
               </div>
             </div>
           )

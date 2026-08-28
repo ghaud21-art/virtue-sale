@@ -6,12 +6,12 @@ import { GavelIcon, CoinIcon } from '../components/icons'
 // 교사 화면(반 정보 카드)의 링크를 통해서만 열 수 있다.
 const roles = [
   {
-    to: '/teacher', title: '교사 화면', icon: <GavelIcon size={26} />,
+    to: '/teacher', title: '교사로 입장하기', icon: <GavelIcon size={26} />,
     desc: '반을 만들고 학생 제안을 승인한 뒤 경매를 진행합니다. 종료 후 결과 내보내기까지.',
     cta: '반 만들기 / 이어하기', accent: C.orange,
   },
   {
-    to: '/student', title: '학생 화면', icon: <CoinIcon size={26} />,
+    to: '/student', title: '학생으로 입장하기', icon: <CoinIcon size={26} />,
     desc: '반 코드와 이름으로 입장해 가치를 제안하고, 예산으로 나의 행복을 낙찰받으세요.',
     cta: '반 코드로 입장', accent: C.yellow,
   },

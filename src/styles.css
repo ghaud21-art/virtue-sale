@@ -1,5 +1,8 @@
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; }
+/* flex/grid 항목은 기본적으로 min-width:auto라 내용이 길면 컨테이너보다 넓어져
+   overflow:hidden 카드 밖으로 잘려나간다. 0으로 낮춰 항상 부모 폭 안에서 줄어들게 한다. */
+*, *::before, *::after { min-width: 0; }
+html, body { margin: 0; padding: 0; overflow-x: hidden; }
 body {
   background: #FBF3E7;
   font-family: 'IBM Plex Sans KR', sans-serif;
