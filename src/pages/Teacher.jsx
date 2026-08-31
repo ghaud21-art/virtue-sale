@@ -26,12 +26,20 @@ export default function Teacher() {
   const handleCreated = useCallback((res) => {
     const s = { classId: res.class_id, teacherKey: res.teacher_key, code: res.code }
     session.saveTeacher(s)
+    session.rememberClass(s)
     setClassId(s.classId); setTeacherKey(s.teacherKey); setCode(s.code)
     setTab('setup')
   }, [])
 
+  // 목록에서 저장해둔 반을 클릭했을 때: 서버 호출 없이 바로 전환 (교사 키는 이미 브라우저에 있음)
+  const handlePick = useCallback((c) => {
+    session.saveTeacher(c)
+    setClassId(c.classId); setTeacherKey(c.teacherKey); setCode(c.code)
+    setTab('setup')
+  }, [])
+
   if (!classId) {
-    return <SetupNew onCreated={handleCreated} />
+    return <SetupNew onCreated={handleCreated} onPick={handlePick} />
   }
 
   return (
@@ -93,7 +101,7 @@ function ErrorBanner({ message, onRetry }) {
 
 // ---------------- 1. 반 생성 ----------------
 
-function SetupNew({ onCreated }) {
+function SetupNew({ onCreated, onPick }) {
   const [budget, setBudget] = useState(1000)
   const [maxWins, setMaxWins] = useState(3)
   const [twist, setTwist] = useState(true)
@@ -105,6 +113,7 @@ function SetupNew({ onCreated }) {
   const [error, setError] = useState('')
   const [reopenCode, setReopenCode] = useState('')
   const [reopenKey, setReopenKey] = useState('')
+  const [myClasses, setMyClasses] = useState(() => session.listClasses())
 
   const create = async () => {
     setBusy(true); setError('')
@@ -118,15 +127,51 @@ function SetupNew({ onCreated }) {
     setBusy(true); setError('')
     try {
       const res = await api.getClassByKey(reopenCode, reopenKey)
-      onCreated({ class_id: res.class_id, teacher_key: reopenKey, code: res.code })
+      const s = { classId: res.class_id, teacherKey: reopenKey, code: res.code }
+      session.rememberClass(s)
+      onCreated({ class_id: s.classId, teacher_key: s.teacherKey, code: s.code })
     } catch (e) { setError(e.message) } finally { setBusy(false) }
+  }
+
+  const removeFromList = (classId) => {
+    session.forgetClass(classId)
+    setMyClasses(session.listClasses())
   }
 
   return (
     <div style={{ maxWidth: 1160, margin: '0 auto', padding: '28px 24px 80px', display: 'grid', gap: 24 }}>
+      {myClasses.length > 0 && (
+        <Card style={{ padding: 24 }}>
+          <div className="bhs" style={{ fontSize: 20, marginBottom: 4 }}>내 반 목록</div>
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}>
+            여러 반을 운영 중이라면 여기서 바로 이어할 수 있어요. 이 브라우저에서 만들었거나 연 반만 표시됩니다.
+          </div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {myClasses.map(c => (
+              <div key={c.classId} style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                border: `1.5px solid ${C.line}`, borderRadius: 12, padding: '10px 14px',
+              }}>
+                <button onClick={() => onPick(c)} style={{
+                  background: 'none', border: 'none', textAlign: 'left', flex: 1, cursor: 'pointer',
+                  display: 'flex', alignItems: 'baseline', gap: 10,
+                }}>
+                  <span className="bhs" style={{ fontSize: 18, color: C.orange }}>{c.code}</span>
+                  <span style={{ fontSize: 12, color: C.muted }}>
+                    {c.savedAt ? new Date(c.savedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
+                  </span>
+                </button>
+                <button onClick={() => removeFromList(c.classId)} title="목록에서 지우기" style={{
+                  width: 26, height: 26, border: 'none', background: 'none', color: C.faint, fontSize: 18, lineHeight: 1, cursor: 'pointer',
+                }}>×</button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, alignItems: 'start' }}>
         <Card style={{ padding: 28, display: 'grid', gap: 18 }}>
-          <div className="bhs" style={{ fontSize: 20 }}>경매 설정</div>
+          <div className="bhs" style={{ fontSize: 20 }}>새 반 만들기</div>
           <Row label="초기 예산" desc="학생 1인당 지급 포인트">
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <input type="number" value={budget} onChange={e => setBudget(e.target.value)}
@@ -148,8 +193,8 @@ function SetupNew({ onCreated }) {
           <PrimaryBtn onClick={create} disabled={busy}>{busy ? '생성 중...' : '반 열기 → 가치 모으기 시작'}</PrimaryBtn>
         </Card>
         <Card style={{ padding: 28, display: 'grid', gap: 14 }}>
-          <div className="bhs" style={{ fontSize: 20 }}>이미 만든 반으로 돌아가기</div>
-          <div style={{ fontSize: 13, color: C.muted }}>브라우저를 새로 열었다면 반 코드와 발급받은 교사 키를 입력하세요.</div>
+          <div className="bhs" style={{ fontSize: 20 }}>다른 기기에서 이어하기</div>
+          <div style={{ fontSize: 13, color: C.muted }}>다른 컴퓨터·브라우저에서 만든 반이라면 코드와 발급받은 교사 키를 입력하세요.</div>
           <Field label="반 코드">
             <input value={reopenCode} onChange={e => setReopenCode(e.target.value.toUpperCase())} placeholder="예: HB27X9" style={inputStyle} />
           </Field>

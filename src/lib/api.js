@@ -89,7 +89,8 @@ export const api = {
 }
 
 // localStorage 세션
-const T_KEY = 'auction_teacher_session'
+const T_KEY = 'auction_teacher_session'   // 현재 이 탭에서 열려 있는 반
+const T_LIST_KEY = 'auction_teacher_classes' // 이 브라우저에서 만들었거나 열어본 반 전체 목록 (여러 반 운영용)
 const S_KEY = 'auction_student_session'
 
 export const session = {
@@ -99,4 +100,17 @@ export const session = {
   saveStudent: v => localStorage.setItem(S_KEY, JSON.stringify(v)),
   loadStudent: () => { try { return JSON.parse(localStorage.getItem(S_KEY)) } catch { return null } },
   clearStudent: () => localStorage.removeItem(S_KEY),
+
+  listClasses: () => {
+    try { return JSON.parse(localStorage.getItem(T_LIST_KEY)) || [] } catch { return [] }
+  },
+  // 새로 만들거나 코드+키로 다시 연 반을 목록 맨 앞에 기억해둔다 (있으면 갱신, 없으면 추가)
+  rememberClass: ({ classId, teacherKey, code }) => {
+    const list = session.listClasses().filter(c => c.classId !== classId)
+    list.unshift({ classId, teacherKey, code, savedAt: Date.now() })
+    localStorage.setItem(T_LIST_KEY, JSON.stringify(list.slice(0, 30)))
+  },
+  forgetClass: (classId) => {
+    localStorage.setItem(T_LIST_KEY, JSON.stringify(session.listClasses().filter(c => c.classId !== classId)))
+  },
 }
