@@ -52,7 +52,7 @@ create table if not exists auction_items (
   id uuid primary key default gen_random_uuid(),
   class_id uuid not null references auction_classes(id) on delete cascade,
   name text not null,
-  source text not null default 'seed' check (source in ('seed','student')),
+  source text not null default 'seed' check (source in ('seed','student','teacher')),
   proposed_by uuid references auction_students(id) on delete set null,
   approved boolean not null default false,
   tag text not null default 'in' check (tag in ('ex','in')),
@@ -149,62 +149,12 @@ begin
   end if;
 end $$;
 
--- ---------- 반 생성 (+ 기본 가치 35개 시드) ----------
-
--- 예전 버전이 남아있다면 제거 (파라미터 목록이 달라 create or replace로 덮어써지지 않음)
-drop function if exists auction_create_class(int, int, boolean);
-drop function if exists auction_create_class(int, int, boolean, boolean, text, text, text, text);
-
-create or replace function auction_create_class(
-  p_budget int default 1000,
-  p_max_wins int default 3,
-  p_twist boolean default true,
-  p_q1 text default null,
-  p_q2 text default null,
-  p_q3 text default null,
-  p_happiness_prompt text default null
-) returns json
-language plpgsql security definer set search_path = public, extensions as $$
-declare
-  v_code text;
-  v_key text;
-  v_id uuid;
-  v_seed record;
-begin
-  if p_budget < 100 or p_budget > 100000 then
-    raise exception '초기 예산은 100~100000 사이여야 합니다';
-  end if;
-  if p_max_wins < 1 or p_max_wins > 9 then
-    raise exception '1인 최대 낙찰 수는 1~9 사이여야 합니다';
-  end if;
-
-  loop
-    -- 헷갈리는 문자(0,O,1,I,L) 제외한 6자리 코드
-    select string_agg(substr('23456789ABCDEFGHJKMNPQRSTUVWXYZ', (random()*30)::int + 1, 1), '')
-      into v_code from generate_series(1, 6);
-    exit when not exists (select 1 from auction_classes where code = v_code);
-  end loop;
-
-  v_key := encode(gen_random_bytes(16), 'hex');
-
-  insert into auction_classes (
-    code, initial_budget, max_wins, twist_enabled,
-    reflect_q1, reflect_q2, reflect_q3, happiness_prompt
-  )
-  values (
-    v_code, p_budget, p_max_wins, p_twist,
-    coalesce(nullif(trim(p_q1), ''), '이번 경매에서 내가 가장 많은 돈을 쓴 가치는 무엇이고, 그 이유는 무엇인가요?'),
-    coalesce(nullif(trim(p_q2), ''), '예산이 부족해 포기했던 가치 중 가장 아쉬운 것은 무엇인가요? 그것이 없어도 나는 괜찮을까요?'),
-    coalesce(nullif(trim(p_q3), ''), '오늘 등장한 가치들 중, 사실은 돈이 없어도 얻을 수 있는 것이 있었다면 무엇인가요?'),
-    coalesce(nullif(trim(p_happiness_prompt), ''), '내가 생각하는 진정한 행복이란')
-  )
-  returning id into v_id;
-
-  insert into auction_class_keys (class_id, teacher_key) values (v_id, v_key);
-
-  -- 기본 가치 세트 35개 (외재적/내재적 골고루)
-  insert into auction_items (class_id, name, source, approved, tag)
-  select v_id, s.name, 'seed', true, s.tag from (values
+-- 기본 가치 35개 세트. auction_create_class(최초 시드)와 auction_load_preset_items
+-- (교사가 가치 관리 화면에서 "불러오기" 버튼으로 다시 채울 때) 둘 다 이 목록을 공유한다.
+create or replace function auction__preset_values()
+returns table(name text, tag text)
+language sql immutable as $$
+  select * from (values
     ('평생 건강',              'in'),
     ('진실한 우정',            'in'),
     ('마음의 평온',            'in'),
@@ -240,7 +190,64 @@ begin
     ('평생 걱정 없는 노후 자금', 'ex'),
     ('최신 스마트폰과 게임기', 'ex'),
     ('전국 대회 우승 트로피',  'ex')
-  ) as s(name, tag);
+  ) as s(name, tag)
+$$;
+
+-- ---------- 반 생성 (+ 기본 가치 35개 시드) ----------
+
+-- 예전 버전이 남아있다면 제거 (파라미터 목록이 달라 create or replace로 덮어써지지 않음)
+drop function if exists auction_create_class(int, int, boolean);
+drop function if exists auction_create_class(int, int, boolean, boolean, text, text, text, text);
+
+create or replace function auction_create_class(
+  p_budget int default 1000,
+  p_max_wins int default 3,
+  p_twist boolean default true,
+  p_q1 text default null,
+  p_q2 text default null,
+  p_q3 text default null,
+  p_happiness_prompt text default null
+) returns json
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_code text;
+  v_key text;
+  v_id uuid;
+begin
+  if p_budget < 100 or p_budget > 100000 then
+    raise exception '초기 예산은 100~100000 사이여야 합니다';
+  end if;
+  if p_max_wins < 1 or p_max_wins > 30 then
+    raise exception '1인 최대 낙찰 수는 1~30 사이여야 합니다';
+  end if;
+
+  loop
+    -- 헷갈리는 문자(0,O,1,I,L) 제외한 6자리 코드
+    select string_agg(substr('23456789ABCDEFGHJKMNPQRSTUVWXYZ', (random()*30)::int + 1, 1), '')
+      into v_code from generate_series(1, 6);
+    exit when not exists (select 1 from auction_classes where code = v_code);
+  end loop;
+
+  v_key := encode(gen_random_bytes(16), 'hex');
+
+  insert into auction_classes (
+    code, initial_budget, max_wins, twist_enabled,
+    reflect_q1, reflect_q2, reflect_q3, happiness_prompt
+  )
+  values (
+    v_code, p_budget, p_max_wins, p_twist,
+    coalesce(nullif(trim(p_q1), ''), '이번 경매에서 내가 가장 많은 돈을 쓴 가치는 무엇이고, 그 이유는 무엇인가요?'),
+    coalesce(nullif(trim(p_q2), ''), '예산이 부족해 포기했던 가치 중 가장 아쉬운 것은 무엇인가요? 그것이 없어도 나는 괜찮을까요?'),
+    coalesce(nullif(trim(p_q3), ''), '오늘 등장한 가치들 중, 사실은 돈이 없어도 얻을 수 있는 것이 있었다면 무엇인가요?'),
+    coalesce(nullif(trim(p_happiness_prompt), ''), '내가 생각하는 진정한 행복이란')
+  )
+  returning id into v_id;
+
+  insert into auction_class_keys (class_id, teacher_key) values (v_id, v_key);
+
+  -- 기본 가치 세트 35개 (외재적/내재적 골고루)
+  insert into auction_items (class_id, name, source, approved, tag)
+  select v_id, s.name, 'seed', true, s.tag from auction__preset_values() s;
 
   return json_build_object('class_id', v_id, 'code', v_code, 'teacher_key', v_key);
 end $$;
@@ -317,6 +324,50 @@ begin
   returning id into v_id;
 
   return json_build_object('item_id', v_id);
+end $$;
+
+-- ---------- 교사: 가치 직접 추가 ----------
+
+create or replace function auction_add_item(
+  p_class_id uuid, p_key text, p_name text, p_tag text default 'in'
+) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  v_name text := trim(p_name);
+  v_id uuid;
+begin
+  perform auction__auth_teacher(p_class_id, p_key);
+  if length(v_name) < 1 or length(v_name) > 30 then
+    raise exception '가치 이름은 1~30자여야 합니다';
+  end if;
+
+  insert into auction_items (class_id, name, source, approved, tag)
+  values (p_class_id, v_name, 'teacher', true, coalesce(nullif(p_tag, ''), 'in'))
+  returning id into v_id;
+
+  return json_build_object('item_id', v_id);
+end $$;
+
+-- ---------- 교사: 기본 가치 35개 세트 불러오기 (이미 있는 이름은 건너뜀) ----------
+
+create or replace function auction_load_preset_items(
+  p_class_id uuid, p_key text
+) returns json
+language plpgsql security definer set search_path = public as $$
+declare
+  v_count int;
+begin
+  perform auction__auth_teacher(p_class_id, p_key);
+
+  insert into auction_items (class_id, name, source, approved, tag)
+  select p_class_id, p.name, 'seed', true, p.tag
+  from auction__preset_values() p
+  where not exists (
+    select 1 from auction_items i where i.class_id = p_class_id and i.name = p.name
+  );
+  get diagnostics v_count = row_count;
+
+  return json_build_object('inserted', v_count);
 end $$;
 
 -- ---------- 교사: 제안 승인/거절/수정/태그 지정 ----------
@@ -617,6 +668,8 @@ grant execute on function auction_create_class(int, int, boolean, text, text, te
 grant execute on function auction_update_settings(uuid, text, text, text, text, text) to anon, authenticated;
 grant execute on function auction_join_class(text, text) to anon, authenticated;
 grant execute on function auction_propose_item(uuid, text) to anon, authenticated;
+grant execute on function auction_add_item(uuid, text, text, text) to anon, authenticated;
+grant execute on function auction_load_preset_items(uuid, text) to anon, authenticated;
 grant execute on function auction_update_item(uuid, text, uuid, text, text, text) to anon, authenticated;
 grant execute on function auction_set_status(uuid, text, text) to anon, authenticated;
 grant execute on function auction_start_item(uuid, text, uuid) to anon, authenticated;

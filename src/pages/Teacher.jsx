@@ -182,8 +182,8 @@ function SetupNew({ onCreated, onPick }) {
           <Row label="1인 최대 낙찰 수" desc="한 명이 가져갈 수 있는 가치 개수">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <button onClick={() => setMaxWins(m => Math.max(1, m - 1))} style={stepBtn}>−</button>
-              <span className="bhs" style={{ fontSize: 24, minWidth: 24, textAlign: 'center' }}>{maxWins}</span>
-              <button onClick={() => setMaxWins(m => Math.min(9, m + 1))} style={stepBtn}>+</button>
+              <span className="bhs" style={{ fontSize: 24, minWidth: 36, textAlign: 'center', whiteSpace: 'nowrap', flexShrink: 0 }}>{maxWins}</span>
+              <button onClick={() => setMaxWins(m => Math.min(30, m + 1))} style={stepBtn}>+</button>
             </div>
           </Row>
           <Row label="반전 룰" desc='경매 종료 후 "세계 경제 붕괴" 시나리오 공개'>
@@ -347,11 +347,31 @@ function InfoLine({ label, value }) {
 function ValuesTab({ classId, teacherKey, items, onDone }) {
   const pending = useMemo(() => items.filter(i => i.source === 'student' && !i.approved && i.status !== 'rejected'), [items])
   const confirmed = useMemo(() => items.filter(i => i.approved && i.status !== 'rejected').sort((a, b) => new Date(a.created_at) - new Date(b.created_at)), [items])
-  const [editing, setEditing] = useState(null) // item id
+  const [editing, setEditing] = useState(null) // item id (학생 제안)
+  const [editingConfirmed, setEditingConfirmed] = useState(null) // item id (확정 목록)
+  const [newName, setNewName] = useState('')
+  const [newTag, setNewTag] = useState('in')
+  const [addBusy, setAddBusy] = useState(false)
+  const [presetBusy, setPresetBusy] = useState(false)
 
   const act = async (item, action, extra) => {
     try { await api.updateItem(classId, teacherKey, item.id, action, extra) }
     catch (e) { alert(e.message) }
+  }
+
+  const addItem = async () => {
+    if (!newName.trim()) return
+    setAddBusy(true)
+    try { await api.addItem(classId, teacherKey, newName, newTag); setNewName('') }
+    catch (e) { alert(e.message) } finally { setAddBusy(false) }
+  }
+
+  const loadPreset = async () => {
+    setPresetBusy(true)
+    try {
+      const res = await api.loadPresetItems(classId, teacherKey)
+      alert(res.inserted > 0 ? `기본 가치 ${res.inserted}개를 불러왔습니다.` : '이미 모두 들어있어 추가된 가치가 없습니다.')
+    } catch (e) { alert(e.message) } finally { setPresetBusy(false) }
   }
 
   return (
@@ -400,21 +420,43 @@ function ValuesTab({ classId, teacherKey, items, onDone }) {
         <div style={{ height: 10, border: `2px solid ${C.ink}`, borderRadius: 999, overflow: 'hidden', marginBottom: 18 }}>
           <div style={{ height: '100%', width: `${Math.min(100, confirmed.length / TARGET_ITEM_COUNT * 100)}%`, background: C.yellow }} />
         </div>
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="새 가치 이름 직접 입력"
+            maxLength={30} onKeyDown={e => e.key === 'Enter' && addItem()}
+            style={{ ...inputStyle, flex: 1, padding: '9px 12px', fontSize: 13 }} />
+          <button onClick={() => setNewTag(t => t === 'in' ? 'ex' : 'in')} style={miniToggle(true)}>
+            {tagMeta(newTag).label}
+          </button>
+          <button onClick={addItem} disabled={addBusy || !newName.trim()} style={{ ...miniBtn(C.orange, '#fff'), flex: 'none', padding: '8px 16px' }}>추가</button>
+        </div>
+        <GhostBtn onClick={loadPreset} disabled={presetBusy} style={{ width: '100%', marginBottom: 18, fontSize: 12, padding: '8px 12px' }}>
+          {presetBusy ? '불러오는 중...' : '기본 가치 35개 세트 불러오기'}
+        </GhostBtn>
+
         <div style={{ display: 'grid', gap: 8, maxHeight: 420, overflow: 'auto' }}>
           {confirmed.map((v, i) => (
-            <div key={v.id} style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
-              border: `1.5px solid ${C.line}`, borderRadius: 12, padding: '10px 14px',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 12, color: C.faint, fontWeight: 700, width: 22 }}>{String(i + 1).padStart(2, '0')}</span>
-                <span style={{ fontWeight: 500, fontSize: 14 }}>{v.name}</span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <TagPill tag={v.tag} onClick={() => act(v, 'edit', { tag: v.tag === 'in' ? 'ex' : 'in' })} />
-                <button onClick={() => { if (confirm(`"${v.name}"을(를) 목록에서 제거할까요?`)) act(v, 'delete') }}
-                  style={{ width: 24, height: 24, border: 'none', background: 'none', color: C.faint, fontSize: 16, lineHeight: 1 }}>×</button>
-              </div>
+            <div key={v.id} style={{ border: `1.5px solid ${C.line}`, borderRadius: 12, padding: '10px 14px' }}>
+              {editingConfirmed === v.id ? (
+                <EditRow item={v} saveLabel="저장" onCancel={() => setEditingConfirmed(null)} onSave={async (name, tag) => {
+                  await act(v, 'edit', { name, tag }); setEditingConfirmed(null)
+                }} />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <button onClick={() => setEditingConfirmed(v.id)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', flex: 1,
+                    display: 'flex', alignItems: 'center', gap: 10, padding: 0,
+                  }}>
+                    <span style={{ fontSize: 12, color: C.faint, fontWeight: 700, width: 22, flexShrink: 0 }}>{String(i + 1).padStart(2, '0')}</span>
+                    <span style={{ fontWeight: 500, fontSize: 14, color: C.ink }}>{v.name}</span>
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <TagPill tag={v.tag} onClick={() => act(v, 'edit', { tag: v.tag === 'in' ? 'ex' : 'in' })} />
+                    <button onClick={() => { if (confirm(`"${v.name}"을(를) 목록에서 제거할까요?`)) act(v, 'delete') }}
+                      style={{ width: 24, height: 24, border: 'none', background: 'none', color: C.faint, fontSize: 16, lineHeight: 1 }}>×</button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -426,7 +468,7 @@ function ValuesTab({ classId, teacherKey, items, onDone }) {
   )
 }
 
-function EditRow({ item, onCancel, onSave }) {
+function EditRow({ item, onCancel, onSave, saveLabel = '저장 & 승인' }) {
   const [name, setName] = useState(item.name)
   const [tag, setTag] = useState(item.tag)
   return (
@@ -437,7 +479,7 @@ function EditRow({ item, onCancel, onSave }) {
         <button onClick={() => setTag('ex')} style={miniToggle(tag === 'ex')}>외재적</button>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        <button onClick={() => onSave(name, tag)} style={miniBtn(C.green, '#fff')}>저장 & 승인</button>
+        <button onClick={() => onSave(name, tag)} style={miniBtn(C.green, '#fff')}>{saveLabel}</button>
         <button onClick={onCancel} style={miniBtn('#fff', C.ink)}>취소</button>
       </div>
     </div>

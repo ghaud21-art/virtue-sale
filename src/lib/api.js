@@ -28,6 +28,10 @@ export const api = {
     rpc('auction_join_class', { p_code: code, p_name: name }),
   proposeItem: (studentId, name) =>
     rpc('auction_propose_item', { p_student_id: studentId, p_name: name }),
+  addItem: (classId, key, name, tag) =>
+    rpc('auction_add_item', { p_class_id: classId, p_key: key, p_name: name, p_tag: tag ?? 'in' }),
+  loadPresetItems: (classId, key) =>
+    rpc('auction_load_preset_items', { p_class_id: classId, p_key: key }),
   updateItem: (classId, key, itemId, action, extra = {}) =>
     rpc('auction_update_item', {
       p_class_id: classId, p_key: key, p_item_id: itemId, p_action: action,
